@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}html{background:transparent !important;}
+html,body{background:#0F0E2A !important;font-family:'Segoe UI',sans-serif}
+#chatWidget{
+  position:fixed;bottom:16px;right:16px;
+  z-index:999999;
+}
+
+#chatToggleBtn{
+  width:56px;height:56px;border-radius:50%;
+  background:#e84c2b;border:none;cursor:pointer;
+  font-size:24px;color:white;
+  box-shadow:0 4px 18px rgba(232,76,43,0.5);
+  display:flex;align-items:center;justify-content:center;
+  margin-left:auto;transition:transform .2s;
+}
+#chatToggleBtn:hover{transform:scale(1.08)}
+
+#chatWindow{
+  display:none;flex-direction:column;
+  width:320px;height:460px;
+  background:white;border-radius:16px;
+  box-shadow:0 8px 40px rgba(0,0,0,0.2);
+  overflow:hidden;margin-bottom:12px;
+  border:1px solid #e5e9f0;
+}
+
+.cw-header{
+  background:linear-gradient(135deg,#e84c2b,#ff7043);
+  padding:12px 14px;display:flex;
+  align-items:center;gap:10px;
+}
+.cw-avatar{
+  width:32px;height:32px;border-radius:50%;
+  background:rgba(255,255,255,0.2);
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+}
+.cw-name{color:white;font-weight:700;font-size:14px}
+.cw-status{color:rgba(255,255,255,0.8);font-size:11px}
+.cw-close{
+  background:none;border:none;color:white;
+  font-size:18px;cursor:pointer;margin-left:auto;
+  opacity:.8;padding:2px 6px;border-radius:6px;
+}
+.cw-close:hover{opacity:1;background:rgba(255,255,255,0.15)}
+
+#cwMessages{
+  flex:1;overflow-y:auto;padding:12px;
+  display:flex;flex-direction:column;gap:8px;
+  background:#f8f9fb;
+}
+#cwMessages::-webkit-scrollbar{width:4px}
+#cwMessages::-webkit-scrollbar-thumb{background:#dde3ed;border-radius:4px}
+
+.msg{
+  max-width:85%;padding:9px 13px;
+  border-radius:14px;font-size:13px;
+  line-height:1.5;word-wrap:break-word;
+}
+.bot{
+  background:white;color:#1e293b;
+  align-self:flex-start;
+  border:1px solid #e8edf4;
+  border-bottom-left-radius:4px;
+}
+.user{
+  background:#e84c2b;color:white;
+  align-self:flex-end;
+  border-bottom-right-radius:4px;
+}
+.typing{
+  background:white;border:1px solid #e8edf4;
+  align-self:flex-start;padding:11px 14px;
+}
+.dots{display:flex;gap:4px;align-items:center}
+.dots span{
+  width:6px;height:6px;border-radius:50%;
+  background:#94a3b8;
+  animation:bounce 1.2s infinite ease-in-out;
+  display:inline-block;
+}
+.dots span:nth-child(2){animation-delay:.2s}
+.dots span:nth-child(3){animation-delay:.4s}
+@keyframes bounce{
+  0%,80%,100%{transform:scale(.8);opacity:.5}
+  40%{transform:scale(1.2);opacity:1}
+}
+
+.cw-input-area{
+  padding:10px 12px;border-top:1px solid #e8edf4;
+  background:white;display:flex;gap:8px;align-items:center;
+}
+#cwInput{
+  flex:1;border:1px solid #dde3ed;border-radius:22px;
+  padding:8px 13px;font-size:13px;outline:none;
+  background:#f8f9fb;color:#1e293b;
+  font-family:'Segoe UI',sans-serif;
+}
+#cwInput:focus{border-color:#e84c2b;background:white}
+#cwInput::placeholder{color:#94a3b8}
+#cwSendBtn{
+  width:34px;height:34px;border-radius:50%;
+  background:#e84c2b;border:none;cursor:pointer;
+  color:white;font-size:15px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:background .15s;
+}
+#cwSendBtn:hover{background:#c73d20}
+#cwSendBtn:disabled{background:#cbd5e1;cursor:default}
+</style>
+</head>
+<body>
+
+<div id="chatWidget">
+  <div id="chatWindow">
+    <div class="cw-header">
+      <div class="cw-avatar">🤖</div>
+      <div>
+        <div class="cw-name">AutoPilot AI</div>
+        <div class="cw-status">● Online</div>
+      </div>
+      <button class="cw-close" onclick="cwClose()">✕</button>
+    </div>
+    <div id="cwMessages">
+      <div class="msg bot">Hi! 👋 I'm AutoPilot AI. Ask me anything about your leads, revenue, or agents!</div>
+    </div>
+    <div style="padding:10px;background:white;border-top:1px solid #e8edf4">
+  <input
+      id="cwEmail"
+      type="email"
+      placeholder="Enter your email"
+      style="width:100%;padding:8px;margin-bottom:8px;border:1px solid #ddd;border-radius:8px;"
+  >
+
+  <div class="cw-input-area">
+      <input id="cwInput" placeholder="Ask me anything…" onkeydown="if(event.key==='Enter')cwSend()">
+      <button id="cwSendBtn" onclick="cwSend()">➤</button>
+  </div>
+</div>
+      <input id="cwInput" placeholder="Ask me anything…" onkeydown="if(event.key==='Enter')cwSend()">
+      <button id="cwSendBtn" onclick="cwSend()">➤</button>
+    </div>
+  </div>
+  <button id="chatToggleBtn" onclick="cwToggle()">💬</button>
+</div>
+
+<script>
+var cwOpen = false;
+var cwHistory = [];
+
+// ⚠️ Replace with your actual Anthropic API key
+const ANTHROPIC_API_KEY = "YOUR_API_KEY_HERE";
+
+function cwToggle(){
+  cwOpen = !cwOpen;
+  var win = document.getElementById('chatWindow');
+  win.style.display = cwOpen ? 'flex' : 'none';
+  if(cwOpen) document.getElementById('cwInput').focus();
+}
+
+function cwClose(){
+  cwOpen = false;
+  document.getElementById('chatWindow').style.display = 'none';
+}
+
+function cwAddMsg(text, role){
+  var el = document.getElementById('cwMessages');
+  var d = document.createElement('div');
+  d.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
+  d.textContent = text;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+
+function cwShowTyping(){
+  var el = document.getElementById('cwMessages');
+  var d = document.createElement('div');
+  d.className = 'msg typing';
+  d.id = 'cwTyping';
+  d.innerHTML = '<div class="dots"><span></span><span></span><span></span></div>';
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+
+function cwRemoveTyping(){
+  var t = document.getElementById('cwTyping');
+  if(t) t.remove();
+}
+async function cwSend(){
+  var inp = document.getElementById('cwInput');
+  var btn = document.getElementById('cwSendBtn');
+  var text = inp.value.trim();
+  if(!text) return;
+
+  cwAddMsg(text, 'user');
+  cwHistory.push({role:'user', content:text});
+  inp.value = '';
+  btn.disabled = true;
+  cwShowTyping();
+
+  try{
+    var email = document.getElementById('cwEmail').value;
+    var res = await fetch('http://localhost:8502/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+
+     body: JSON.stringify({
+      email: email,
+      messages: cwHistory
+       })
+    });
+    var data = await res.json();
+    var reply = data.reply || 'No response.';
+    cwHistory.push({role:'assistant', content:reply});
+    cwRemoveTyping();
+    cwAddMsg(reply, 'bot');
+  } catch(e){
+    cwRemoveTyping();
+    cwAddMsg('Error: ' + e.message, 'bot');
+  }
+
+  btn.disabled = false;
+  document.getElementById('cwInput').focus();
+}
+</script>
+</body>
+</html>
